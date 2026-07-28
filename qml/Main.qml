@@ -64,20 +64,29 @@ Window {
 
     // ---- Reusable pieces ------------------------------------------------
 
-    // P1 swaps this frosted approximation for the real hyprglass lens port.
-    component GlassButton: Rectangle {
+    // Real hyprglass lens: each button refracts the video underneath it.
+    component GlassButton: Item {
         id: gbtn
         signal activated()
         property real diameter: 56
         property bool hovered: ma.containsMouse
+        property color tint: Qt.rgba(0, 0, 0, ma.containsMouse ? 0.34 : 0.22)
         width: diameter
         height: diameter
-        radius: diameter / 2
-        color: Qt.rgba(1, 1, 1, ma.containsMouse ? 0.22 : 0.10)
-        border.color: Qt.rgba(1, 1, 1, 0.30)
-        border.width: 1
         scale: ma.pressed ? 0.94 : (ma.containsMouse ? 1.12 : 1)
         Behavior on scale { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.004 } }
+        GlassItem {
+            anchors.fill: parent
+            videoSource: mpv
+            tint: gbtn.tint
+        }
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
+            color: "transparent"
+            border.color: Qt.rgba(1, 1, 1, gbtn.hovered ? 0.42 : 0.28)
+            border.width: 1
+        }
         MouseArea {
             id: ma
             anchors.fill: parent
@@ -157,7 +166,7 @@ Window {
             id: playBtn
             diameter: 76
             anchors.verticalCenter: parent.verticalCenter
-            color: Qt.rgba(win.primary.r, win.primary.g, win.primary.b, hovered ? 0.75 : 0.55)
+            tint: Qt.rgba(win.primary.r, win.primary.g, win.primary.b, hovered ? 0.62 : 0.45)
             onActivated: mpv.togglePause()
 
             Item {
@@ -444,11 +453,34 @@ Window {
             if (mpv.duration > 0 && frames > 30) {
                 console.log("KADR_SMOKE_OK duration=" + mpv.duration + " frames=" + frames
                             + " primary=" + win.primary + " dark=" + Theme.dark);
-                Qt.quit();
+                if (shotPath !== "") {
+                    mpv.seek(780);
+                    shotTimer.start();
+                } else {
+                    Qt.quit();
+                }
             } else {
                 console.log("KADR_SMOKE_FAIL duration=" + mpv.duration + " frames=" + frames);
                 Qt.exit(1);
             }
         }
+    }
+    Timer {
+        id: shotTimer
+        interval: 2200
+        onTriggered: {
+            hideTimer.stop();
+            win.controlsShown = true;
+            grabTimer.start();
+        }
+    }
+    Timer {
+        id: grabTimer
+        interval: 450
+        onTriggered: win.contentItem.grabToImage((result) => {
+            result.saveToFile(shotPath);
+            console.log("KADR_SHOT_SAVED " + shotPath);
+            Qt.quit();
+        })
     }
 }

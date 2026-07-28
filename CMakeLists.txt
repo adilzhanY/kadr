@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick OpenGL)
+find_package(Qt6 REQUIRED COMPONENTS Quick OpenGL ShaderTools)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
 
@@ -20,9 +20,15 @@ qt_add_qml_module(kadr
     VERSION 1.0
     QML_FILES
         qml/Main.qml
+        qml/GlassItem.qml
     SOURCES
         src/mpvobject.cpp src/mpvobject.h
         src/theme.cpp src/theme.h
+)
+
+qt_add_shaders(kadr "kadr_shaders"
+    PREFIX "/kadr"
+    FILES shaders/glass.frag
 )
 
 target_include_directories(kadr PRIVATE src)

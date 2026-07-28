@@ -24,6 +24,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("cliFile"), file);
     engine.rootContext()->setContextProperty(
         QStringLiteral("smokeTest"), qEnvironmentVariableIsSet("KADR_SMOKE"));
+    engine.rootContext()->setContextProperty(
+        QStringLiteral("shotPath"), qEnvironmentVariable("KADR_SHOT"));
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
