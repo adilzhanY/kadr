@@ -22,11 +22,64 @@ Window {
     property int skipInterval: 10
     property string glassTheme: "liquid"
 
+    // Subtitle style menu: one entry per option page. `values` are what mpv
+    // receives; background color/opacity combine into sub-back-color.
+    readonly property var subOptionDefs: [
+        { key: "subFont", title: "Font family",
+          options: ["SF Pro Rounded", "SF Pro Display", "SF Pro Text", "SF Mono", "Sans Serif"],
+          values: ["SF Pro Rounded", "SF Pro Display", "SF Pro Text", "SF Mono", "sans-serif"] },
+        { key: "subSize", title: "Font size",
+          options: ["50%", "75%", "100%", "150%", "200%"],
+          values: [22, 33, 44, 66, 88] },
+        { key: "subColor", title: "Font color",
+          options: ["White", "Yellow", "Green", "Cyan", "Red", "Blue", "Black"],
+          values: ["#FFFFFF", "#FFE082", "#66BB6A", "#4DD0E1", "#EF5350", "#42A5F5", "#000000"] },
+        { key: "subBackColor", title: "Background color",
+          options: ["None", "Black", "White"],
+          values: ["", "000000", "FFFFFF"] },
+        { key: "subBackOpacity", title: "Background opacity",
+          options: ["25%", "50%", "75%", "100%"],
+          values: [0.25, 0.5, 0.75, 1.0] },
+        { key: "subStrokeColor", title: "Stroke color",
+          options: ["Black", "White"],
+          values: ["#CC000000", "#FFFFFF"] },
+        { key: "subStroke", title: "Stroke thickness",
+          options: ["None", "Thin", "Normal", "Thick"],
+          values: [0, 1.2, 2.2, 3.8] }
+    ]
+
+    function applySubStyle() {
+        const byKey = {};
+        for (const d of subOptionDefs)
+            byKey[d.key] = d;
+        const pick = (k) => byKey[k].values[store[k + "Idx"]];
+        mpv.setProp("sub-font", pick("subFont"));
+        mpv.setProp("sub-font-size", pick("subSize"));
+        mpv.setProp("sub-color", pick("subColor"));
+        mpv.setProp("sub-border-color", pick("subStrokeColor"));
+        mpv.setProp("sub-border-size", pick("subStroke"));
+        const backRgb = pick("subBackColor");
+        if (backRgb === "") {
+            mpv.setProp("sub-back-color", "#00000000");
+        } else {
+            const a = Math.round(pick("subBackOpacity") * 255)
+                .toString(16).padStart(2, "0").toUpperCase();
+            mpv.setProp("sub-back-color", "#" + a + backRgb);
+        }
+    }
+
     Settings {
         id: store
         property string glassTheme: "liquid"
         property int skipInterval: 10
         property real speed: 1.0
+        property int subFontIdx: 0
+        property int subSizeIdx: 2
+        property int subColorIdx: 0
+        property int subBackColorIdx: 0
+        property int subBackOpacityIdx: 2
+        property int subStrokeColorIdx: 0
+        property int subStrokeIdx: 2
     }
     onGlassThemeChanged: if (envTheme === "") store.glassTheme = glassTheme
     onSkipIntervalChanged: store.skipInterval = skipInterval
@@ -47,6 +100,7 @@ Window {
         skipInterval = store.skipInterval;
         glassTheme = envTheme !== "" ? envTheme : store.glassTheme;
         mpv.speed = store.speed;
+        applySubStyle();
         if (holdControls) settingsOpen = true;
     }
 
@@ -485,13 +539,139 @@ Window {
 
     // ---- Settings panel --------------------------------------------------
 
+    // Reusable pieces for the YouTube-style settings menu
+
+    component MenuRow: Item {
+        id: mrow
+        property string label
+        property string value: ""
+        signal activated()
+        width: parent ? parent.width : 0
+        height: 44
+        Rectangle {
+            anchors.fill: parent
+            radius: 10
+            color: Qt.rgba(1, 1, 1, mrowMa.containsMouse ? 0.10 : 0)
+        }
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            text: mrow.label
+            color: "white"
+            font.family: win.uiFont
+            font.pixelSize: 14
+        }
+        Row {
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 7
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: mrow.value
+                color: Qt.rgba(1, 1, 1, 0.65)
+                font.family: win.uiFont
+                font.pixelSize: 13
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "›"
+                color: Qt.rgba(1, 1, 1, 0.65)
+                font.family: win.uiFont
+                font.bold: true
+                font.pixelSize: 16
+            }
+        }
+        MouseArea {
+            id: mrowMa
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: mrow.activated()
+        }
+    }
+
+    component OptionRow: Item {
+        id: orow
+        property string label
+        property bool selected: false
+        signal activated()
+        width: parent ? parent.width : 0
+        height: 40
+        Rectangle {
+            anchors.fill: parent
+            radius: 10
+            color: Qt.rgba(1, 1, 1, orowMa.containsMouse ? 0.10 : 0)
+        }
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            width: 20
+            text: orow.selected ? "✓" : ""
+            color: "white"
+            font.family: win.uiFont
+            font.bold: true
+            font.pixelSize: 14
+        }
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 38
+            anchors.verticalCenter: parent.verticalCenter
+            text: orow.label
+            color: "white"
+            font.family: win.uiFont
+            font.pixelSize: 14
+        }
+        MouseArea {
+            id: orowMa
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: orow.activated()
+        }
+    }
+
+    component MenuPage: Item {
+        id: mpage
+        required property string name
+        default property alias content: pageCol.data
+        width: parent ? parent.width : 0
+        implicitHeight: pageCol.implicitHeight
+        visible: opacity > 0
+        opacity: settingsPanel.page === name ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 140 } }
+        onVisibleChanged: {
+            if (visible) {
+                settingsPanel.contentHeight = implicitHeight;
+                slideAnim.from = 18 * settingsPanel.navDir;
+                slideAnim.restart();
+            }
+        }
+        onImplicitHeightChanged: if (visible) settingsPanel.contentHeight = implicitHeight
+        NumberAnimation {
+            id: slideAnim
+            target: mpage
+            property: "x"
+            to: 0
+            duration: 220
+            easing.type: Easing.OutCubic
+        }
+        Column {
+            id: pageCol
+            width: mpage.width
+            spacing: 2
+        }
+    }
+
     Item {
         id: settingsPanel
         anchors.bottom: bottomBar.top
         anchors.bottomMargin: 16
         anchors.right: bottomBar.right
-        width: 330
-        height: panelCol.implicitHeight + 44
+        width: 360
+        height: 58 + contentHeight + 20
         transformOrigin: Item.BottomRight
         opacity: win.settingsOpen ? 1 : 0
         scale: win.settingsOpen ? 1 : 0.68
@@ -502,6 +682,43 @@ Window {
         }
         Behavior on opacity { NumberAnimation { duration: 220 } }
         Behavior on scale { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.004 } }
+        Behavior on height { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.5 } }
+
+        // page navigation state
+        property string page: "root"
+        property int navDir: 1
+        property var activeDef: null
+        property real contentHeight: 180
+
+        function navigate(to, dir) {
+            navDir = dir;
+            page = to;
+        }
+        function goBack() {
+            navigate(page === "option" ? "subtitles" : "root", -1);
+        }
+        function titleFor(p) {
+            if (p === "speed") return "Playback speed";
+            if (p === "subtitles") return "Subtitles";
+            if (p === "theme") return "Theme";
+            if (p === "skip") return "Skip interval";
+            if (p === "option") return activeDef ? activeDef.title : "";
+            return "Settings";
+        }
+
+        // return to the root page once the close animation finished
+        Timer {
+            id: pageResetTimer
+            interval: 260
+            onTriggered: settingsPanel.navigate("root", -1)
+        }
+        Connections {
+            target: win
+            function onSettingsOpenChanged() {
+                if (!win.settingsOpen)
+                    pageResetTimer.start();
+            }
+        }
 
         GlassItem {
             anchors.fill: parent
@@ -524,23 +741,189 @@ Window {
             onPositionChanged: win.poke()
         }
 
-        Column {
-            id: panelCol
-            anchors.centerIn: parent
+        // header: back chevron + title
+        Item {
+            x: 22
+            y: 14
             width: parent.width - 44
-            spacing: 18
-
-            // -- Playback speed --
-            Column {
-                width: parent.width
-                spacing: 10
-                Text {
-                    text: "Playback speed"
-                    color: Qt.rgba(1, 1, 1, 0.85)
-                    font.family: win.uiFont
-                    font.pixelSize: 14
-                    font.bold: true
+            height: 26
+            Text {
+                id: backBtn
+                visible: settingsPanel.page !== "root"
+                anchors.verticalCenter: parent.verticalCenter
+                text: "‹"
+                color: "white"
+                font.family: win.uiFont
+                font.bold: true
+                font.pixelSize: 22
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -8
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: settingsPanel.goBack()
                 }
+            }
+            Text {
+                x: settingsPanel.page === "root" ? 0 : 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: settingsPanel.titleFor(settingsPanel.page)
+                color: "white"
+                font.family: win.uiFont
+                font.bold: true
+                font.pixelSize: 15
+                Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            }
+        }
+        Rectangle {
+            x: 22
+            y: 48
+            width: parent.width - 44
+            height: 1
+            color: Qt.rgba(1, 1, 1, 0.14)
+        }
+
+        Item {
+            id: pages
+            x: 22
+            y: 58
+            width: parent.width - 44
+            height: settingsPanel.contentHeight
+            clip: true
+
+            MenuPage {
+                name: "root"
+                Component.onCompleted: settingsPanel.contentHeight = implicitHeight
+                MenuRow {
+                    label: "Subtitles"
+                    onActivated: settingsPanel.navigate("subtitles", 1)
+                }
+                MenuRow {
+                    label: "Playback speed"
+                    value: mpv.speed === 1 ? "Normal"
+                        : (Number.isInteger(mpv.speed) ? mpv.speed.toFixed(1) : mpv.speed.toString()) + "x"
+                    onActivated: settingsPanel.navigate("speed", 1)
+                }
+                MenuRow {
+                    label: "Theme"
+                    value: win.glassTheme === "blur" ? "Blur" : "Liquid Glass"
+                    onActivated: settingsPanel.navigate("theme", 1)
+                }
+                MenuRow {
+                    label: "Skip interval"
+                    value: win.skipInterval + "s"
+                    onActivated: settingsPanel.navigate("skip", 1)
+                }
+            }
+
+            MenuPage {
+                name: "speed"
+                Item { width: parent.width; height: 6 }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    text: mpv.speed.toFixed(2) + "x"
+                    color: "white"
+                    font.family: win.uiFont
+                    font.bold: true
+                    font.pixelSize: 26
+                }
+                Item { width: parent.width; height: 8 }
+                Item {
+                    width: parent.width
+                    height: 44
+                    Rectangle {
+                        id: speedMinus
+                        width: 36
+                        height: 36
+                        radius: 18
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: Qt.rgba(1, 1, 1, minusMa.containsMouse ? 0.22 : 0.12)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "−"
+                            color: "white"
+                            font.family: win.uiFont
+                            font.bold: true
+                            font.pixelSize: 18
+                        }
+                        MouseArea {
+                            id: minusMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: mpv.speed = Math.max(0.25, Math.round((mpv.speed - 0.25) * 4) / 4)
+                        }
+                    }
+                    Rectangle {
+                        id: speedPlus
+                        width: 36
+                        height: 36
+                        radius: 18
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: Qt.rgba(1, 1, 1, plusMa.containsMouse ? 0.22 : 0.12)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "+"
+                            color: "white"
+                            font.family: win.uiFont
+                            font.bold: true
+                            font.pixelSize: 18
+                        }
+                        MouseArea {
+                            id: plusMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: mpv.speed = Math.min(3, Math.round((mpv.speed + 0.25) * 4) / 4)
+                        }
+                    }
+                    Item {
+                        id: spdSlider
+                        anchors.left: speedMinus.right
+                        anchors.right: speedPlus.left
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 36
+                        readonly property real ratio: Math.max(0, Math.min((mpv.speed - 0.25) / 2.75, 1))
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width
+                            height: 4
+                            radius: 2
+                            color: Qt.rgba(1, 1, 1, 0.35)
+                        }
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width * spdSlider.ratio
+                            height: 4
+                            radius: 2
+                            color: "white"
+                        }
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: parent.width * spdSlider.ratio - 8
+                            width: 16
+                            height: 16
+                            radius: 8
+                            color: "white"
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                            function apply(mx) {
+                                const r = Math.max(0, Math.min(mx / width, 1));
+                                mpv.speed = Math.round((0.25 + r * 2.75) * 20) / 20;
+                            }
+                            onPressed: (mouse) => apply(mouse.x)
+                            onPositionChanged: (mouse) => { if (pressed) apply(mouse.x); }
+                        }
+                    }
+                }
+                Item { width: parent.width; height: 10 }
                 Row {
                     spacing: 8
                     Repeater {
@@ -576,100 +959,77 @@ Window {
                         }
                     }
                 }
+                Item {
+                    width: parent.width
+                    height: 18
+                    Text {
+                        x: 12
+                        y: 2
+                        text: "Normal"
+                        color: Qt.rgba(1, 1, 1, 0.55)
+                        font.family: win.uiFont
+                        font.pixelSize: 11
+                    }
+                }
             }
 
-            // -- Theme --
-            Column {
-                width: parent.width
-                spacing: 10
-                Text {
-                    text: "Theme"
-                    color: Qt.rgba(1, 1, 1, 0.85)
-                    font.family: win.uiFont
-                    font.pixelSize: 14
-                    font.bold: true
-                }
-                Row {
-                    spacing: 10
-                    Repeater {
-                        model: [
-                            { label: "Liquid Glass", value: "liquid" },
-                            { label: "Blur", value: "blur" }
-                        ]
-                        Rectangle {
-                            required property var modelData
-                            readonly property bool selected: win.glassTheme === modelData.value
-                            width: themeChipText.implicitWidth + 30
-                            height: 34
-                            radius: 17
-                            color: selected
-                                ? Qt.rgba(win.primary.r, win.primary.g, win.primary.b, 0.85)
-                                : Qt.rgba(1, 1, 1, 0.12)
-                            border.color: Qt.rgba(1, 1, 1, selected ? 0.5 : 0.25)
-                            border.width: 1
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                            Text {
-                                id: themeChipText
-                                anchors.centerIn: parent
-                                text: parent.modelData.label
-                                color: "white"
-                                font.family: win.uiFont
-                                font.bold: true
-                                font.pixelSize: 14
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: win.glassTheme = parent.modelData.value
-                            }
+            MenuPage {
+                name: "subtitles"
+                Repeater {
+                    model: win.subOptionDefs
+                    MenuRow {
+                        required property var modelData
+                        label: modelData.title
+                        value: modelData.options[store[modelData.key + "Idx"]]
+                        onActivated: {
+                            settingsPanel.activeDef = modelData;
+                            settingsPanel.navigate("option", 1);
                         }
                     }
                 }
             }
 
-            // -- Skip interval --
-            Column {
-                width: parent.width
-                spacing: 10
-                Text {
-                    text: "Skip interval"
-                    color: Qt.rgba(1, 1, 1, 0.85)
-                    font.family: win.uiFont
-                    font.pixelSize: 14
-                    font.bold: true
-                }
-                Row {
-                    spacing: 10
-                    Repeater {
-                        model: [2, 5, 10]
-                        Rectangle {
-                            required property int modelData
-                            readonly property bool selected: win.skipInterval === modelData
-                            width: 62
-                            height: 34
-                            radius: 17
-                            color: selected
-                                ? Qt.rgba(win.primary.r, win.primary.g, win.primary.b, 0.85)
-                                : Qt.rgba(1, 1, 1, 0.12)
-                            border.color: Qt.rgba(1, 1, 1, selected ? 0.5 : 0.25)
-                            border.width: 1
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                            Text {
-                                anchors.centerIn: parent
-                                text: parent.modelData + "s"
-                                color: "white"
-                                font.family: win.uiFont
-                                font.bold: true
-                                font.pixelSize: 14
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: win.skipInterval = parent.modelData
-                            }
+            MenuPage {
+                name: "option"
+                Repeater {
+                    model: settingsPanel.activeDef ? settingsPanel.activeDef.options : []
+                    OptionRow {
+                        required property int index
+                        required property var modelData
+                        label: modelData
+                        selected: settingsPanel.activeDef !== null
+                            && store[settingsPanel.activeDef.key + "Idx"] === index
+                        onActivated: {
+                            store[settingsPanel.activeDef.key + "Idx"] = index;
+                            win.applySubStyle();
                         }
+                    }
+                }
+            }
+
+            MenuPage {
+                name: "theme"
+                OptionRow {
+                    label: "Liquid Glass"
+                    selected: win.glassTheme === "liquid"
+                    onActivated: win.glassTheme = "liquid"
+                }
+                OptionRow {
+                    label: "Blur"
+                    selected: win.glassTheme === "blur"
+                    onActivated: win.glassTheme = "blur"
+                }
+            }
+
+            MenuPage {
+                name: "skip"
+                Repeater {
+                    model: [2, 5, 10]
+                    OptionRow {
+                        required property var modelData
+                        label: modelData + " seconds"
+                        selected: win.skipInterval === modelData
+                        onActivated: win.skipInterval = modelData
                     }
                 }
             }

@@ -208,6 +208,11 @@ void MpvObject::command(const QStringList &args)
     mpv_command_async(m_mpv, 0, argv.data());
 }
 
+void MpvObject::setProp(const QString &name, const QVariant &value)
+{
+    setMpvProperty(name.toUtf8().constData(), value);
+}
+
 void MpvObject::setPause(bool on)
 {
     setMpvProperty("pause", on);

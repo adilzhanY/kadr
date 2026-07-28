@@ -56,6 +56,7 @@ public:
     Q_INVOKABLE void seek(double pos);
     Q_INVOKABLE void seekBy(double secs);
     Q_INVOKABLE void command(const QStringList &args);
+    Q_INVOKABLE void setProp(const QString &name, const QVariant &value);
 
 signals:
     void positionChanged();
