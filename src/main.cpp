@@ -7,6 +7,12 @@
 
 int main(int argc, char *argv[])
 {
+    // Qt picks the single-threaded "basic" render loop on this driver, which
+    // makes mpv's per-frame render block UI animations. The threaded loop
+    // keeps them independent.
+    if (!qEnvironmentVariableIsSet("QSG_RENDER_LOOP"))
+        qputenv("QSG_RENDER_LOOP", "threaded");
+
     // libmpv renders through the OpenGL render API; force the matching RHI backend.
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 

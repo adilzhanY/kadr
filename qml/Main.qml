@@ -416,9 +416,13 @@ Window {
         height: panelCol.implicitHeight + 44
         transformOrigin: Item.BottomRight
         opacity: win.settingsOpen ? 1 : 0
-        scale: win.settingsOpen ? 1 : 0.85
+        scale: win.settingsOpen ? 1 : 0.68
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: 160 } }
+        transform: Translate {
+            y: win.settingsOpen ? 0 : 26
+            Behavior on y { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.02 } }
+        }
+        Behavior on opacity { NumberAnimation { duration: 220 } }
         Behavior on scale { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.004 } }
 
         GlassItem {
