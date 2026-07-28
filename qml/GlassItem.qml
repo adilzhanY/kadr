@@ -28,13 +28,23 @@ Item {
     property real adaptiveBoost: 0.0
 
     // Region of the video under this item, expanded so edge refraction has
-    // pixels to bend inward. Explicit dependencies force re-evaluation when
-    // the item or window moves; ancestor transforms mid-animation lag one
-    // frame, which is invisible in practice.
-    readonly property rect captureRect: {
-        const dep = x + y + width + height + videoSource.width + videoSource.height;
+    // pixels to bend inward. mapToItem gives QML bindings nothing to track
+    // (ancestor moves, Row layout, reveal animations), so the rect is re-synced
+    // every frame right before the scene graph syncs.
+    property rect captureRect: Qt.rect(0, 0, 1, 1)
+
+    function syncRect() {
         const p = root.mapToItem(videoSource, -paddingPx, -paddingPx);
-        return Qt.rect(p.x, p.y, width + 2 * paddingPx, height + 2 * paddingPx);
+        const r = Qt.rect(p.x, p.y, width + 2 * paddingPx, height + 2 * paddingPx);
+        if (r.x !== captureRect.x || r.y !== captureRect.y
+                || r.width !== captureRect.width || r.height !== captureRect.height)
+            captureRect = r;
+    }
+
+    Component.onCompleted: syncRect()
+    Connections {
+        target: root.Window.window
+        function onAfterAnimating() { root.syncRect() }
     }
 
     ShaderEffectSource {

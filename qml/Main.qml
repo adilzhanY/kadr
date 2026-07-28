@@ -70,7 +70,7 @@ Window {
         signal activated()
         property real diameter: 56
         property bool hovered: ma.containsMouse
-        property color tint: Qt.rgba(0, 0, 0, ma.containsMouse ? 0.34 : 0.22)
+        property color tint: Qt.rgba(0, 0, 0, ma.containsMouse ? 0.20 : 0.10)
         width: diameter
         height: diameter
         scale: ma.pressed ? 0.94 : (ma.containsMouse ? 1.12 : 1)
@@ -166,7 +166,6 @@ Window {
             id: playBtn
             diameter: 76
             anchors.verticalCenter: parent.verticalCenter
-            tint: Qt.rgba(win.primary.r, win.primary.g, win.primary.b, hovered ? 0.62 : 0.45)
             onActivated: mpv.togglePause()
 
             Item {
