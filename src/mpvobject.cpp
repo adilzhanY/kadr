@@ -55,9 +55,14 @@ public:
         QOpenGLFramebufferObject *fbo = framebufferObject();
         mpv_opengl_fbo mpvFbo{static_cast<int>(fbo->handle()), fbo->width(), fbo->height(), 0};
         int flipY = 0;
+        // Never let mpv sleep on the render thread until a frame's display
+        // time - that stalls the whole scene graph (30-60ms per video frame);
+        // Qt's render loop does the presentation pacing.
+        int blockForTargetTime = 0;
         mpv_render_param params[]{
             {MPV_RENDER_PARAM_OPENGL_FBO, &mpvFbo},
             {MPV_RENDER_PARAM_FLIP_Y, &flipY},
+            {MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME, &blockForTargetTime},
             {MPV_RENDER_PARAM_INVALID, nullptr},
         };
         mpv_render_context_render(m_obj->m_renderCtx, params);
@@ -84,7 +89,11 @@ MpvObject::MpvObject(QQuickItem *parent)
     if (mpv_initialize(m_mpv) < 0)
         throw std::runtime_error("kadr: failed to initialize mpv");
 
-    mpv_set_option_string(m_mpv, "hwdec", "auto-safe");
+    const QByteArray hwdec = qEnvironmentVariable("KADR_HWDEC", QStringLiteral("auto-safe")).toUtf8();
+    mpv_set_option_string(m_mpv, "hwdec", hwdec.constData());
+    // Recommended companion to BLOCK_FOR_TARGET_TIME=0: don't schedule video
+    // frames ahead of audio by the default 50ms interpolation offset.
+    mpv_set_option_string(m_mpv, "video-timing-offset", "0");
     mpv_set_option_string(m_mpv, "keep-open", "yes");
 
     // Same subtitle look the mentalist script used, rendered by libass.
