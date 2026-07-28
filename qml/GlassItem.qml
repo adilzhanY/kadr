@@ -13,6 +13,8 @@ Item {
     property real cornerRadius: height / 2
     property real roundingPower: 2.0
     property color tint: Qt.rgba(0, 0, 0, 0)
+    property bool blurOnly: false
+    property real blurRadius: 16
 
     property real refractionStrength: 1.0
     property real lensDistortion: 1.0
@@ -76,5 +78,7 @@ Item {
         property real vibrancyDarkness: root.vibrancyDarkness
         property real adaptiveDim: root.adaptiveDim
         property real adaptiveBoost: root.adaptiveBoost
+        property real mode: root.blurOnly ? 1 : 0
+        property real blurRadius: root.blurRadius
     }
 }

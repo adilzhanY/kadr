@@ -31,6 +31,8 @@ layout(std140, binding = 0) uniform buf {
     float vibrancyDarkness;
     float adaptiveDim;
     float adaptiveBoost;
+    float mode;                 // 0 = liquid lens, 1 = plain frosted blur
+    float blurRadius;           // blur kernel radius in item px (mode 1)
 } u;
 
 layout(binding = 1) uniform sampler2D source;
@@ -69,6 +71,28 @@ void main() {
     float cornerAlpha = 1.0 - smoothstep(-1.5, 0.5, cornerSdf);
     if (cornerAlpha < 0.001)
         discard;
+
+    float tintA = u.tintColor.a;
+    vec3 tintRGB = tintA > 0.001 ? u.tintColor.rgb / tintA : vec3(0.0);
+
+    // Blur theme: frosted disc blur + tint, none of the lens effects.
+    if (u.mode > 0.5) {
+        vec3 acc = sampleBlurred(uv).rgb;
+        float total = 1.0;
+        for (int ring = 1; ring <= 2; ++ring) {
+            float rad = u.blurRadius * float(ring) * 0.5;
+            for (int i = 0; i < 8; ++i) {
+                float a = 6.2831853 * (float(i) + 0.5 * float(ring)) / 8.0;
+                vec2 off = vec2(cos(a), sin(a)) * rad / u.fullSize;
+                acc += sampleBlurred(uv + off).rgb;
+                total += 1.0;
+            }
+        }
+        vec3 frosted = mix(acc / total, tintRGB, tintA);
+        float frostedA = u.glassOpacity * cornerAlpha;
+        fragColor = vec4(frosted * frostedA, frostedA) * u.qt_Opacity;
+        return;
+    }
 
     float minDim = min(u.fullSize.x, u.fullSize.y);
     float bezelWidthPx = u.edgeThickness * minDim;
@@ -125,9 +149,7 @@ void main() {
     float darkFactor = 1.0 - u.vibrancyDarkness * (1.0 - blurredLum);
     color = mix(vec3(currentLum), color, 1.0 + u.vibrancy * sat * darkFactor);
 
-    // Color tint overlay (unpremultiply Qt's premultiplied color first)
-    float tintA = u.tintColor.a;
-    vec3 tintRGB = tintA > 0.001 ? u.tintColor.rgb / tintA : vec3(0.0);
+    // Color tint overlay
     color = mix(color, tintRGB, tintA);
 
     // Fresnel rim glow

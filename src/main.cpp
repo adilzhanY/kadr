@@ -28,6 +28,8 @@ int main(int argc, char *argv[])
         QStringLiteral("shotPath"), qEnvironmentVariable("KADR_SHOT"));
     engine.rootContext()->setContextProperty(
         QStringLiteral("holdControls"), qEnvironmentVariableIsSet("KADR_HOLD_CONTROLS"));
+    engine.rootContext()->setContextProperty(
+        QStringLiteral("envTheme"), qEnvironmentVariable("KADR_THEME"));
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);

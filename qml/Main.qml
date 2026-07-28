@@ -18,6 +18,7 @@ Window {
     property bool controlsShown: true
     property bool settingsOpen: false
     property int skipInterval: 10
+    property string glassTheme: envTheme !== "" ? envTheme : "liquid"
     function poke() {
         controlsShown = true;
         hideTimer.restart();
@@ -88,6 +89,7 @@ Window {
             anchors.fill: parent
             videoSource: mpv
             tint: gbtn.tint
+            blurOnly: win.glassTheme === "blur"
         }
         Rectangle {
             anchors.fill: parent
@@ -405,6 +407,7 @@ Window {
             videoSource: mpv
             cornerRadius: 24
             tint: Qt.rgba(0, 0, 0, 0.45)
+            blurOnly: win.glassTheme === "blur"
         }
         Rectangle {
             anchors.fill: parent
@@ -497,6 +500,56 @@ Window {
                         }
                         onPressed: (mouse) => apply(mouse.x)
                         onPositionChanged: (mouse) => { if (pressed) apply(mouse.x); }
+                    }
+                }
+            }
+
+            // -- Theme --
+            Column {
+                width: parent.width
+                spacing: 10
+                Text {
+                    text: "Theme"
+                    color: Qt.rgba(1, 1, 1, 0.85)
+                    font.family: win.uiFont
+                    font.pixelSize: 14
+                    font.bold: true
+                }
+                Row {
+                    spacing: 10
+                    Repeater {
+                        model: [
+                            { label: "Liquid Glass", value: "liquid" },
+                            { label: "Blur", value: "blur" }
+                        ]
+                        Rectangle {
+                            required property var modelData
+                            readonly property bool selected: win.glassTheme === modelData.value
+                            width: themeChipText.implicitWidth + 30
+                            height: 34
+                            radius: 17
+                            color: selected
+                                ? Qt.rgba(win.primary.r, win.primary.g, win.primary.b, 0.85)
+                                : Qt.rgba(1, 1, 1, 0.12)
+                            border.color: Qt.rgba(1, 1, 1, selected ? 0.5 : 0.25)
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Text {
+                                id: themeChipText
+                                anchors.centerIn: parent
+                                text: parent.modelData.label
+                                color: "white"
+                                font.family: win.uiFont
+                                font.bold: true
+                                font.pixelSize: 14
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: win.glassTheme = parent.modelData.value
+                            }
+                        }
                     }
                 }
             }
