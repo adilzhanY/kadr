@@ -534,73 +534,46 @@ Window {
             Column {
                 width: parent.width
                 spacing: 10
-                Item {
-                    width: parent.width
-                    height: speedTitle.implicitHeight
-                    Text {
-                        id: speedTitle
-                        anchors.left: parent.left
-                        text: "Playback speed"
-                        color: Qt.rgba(1, 1, 1, 0.85)
-                        font.family: win.uiFont
-                        font.pixelSize: 14
-                        font.bold: true
-                    }
-                    Text {
-                        anchors.right: parent.right
-                        text: (mpv.speed % 1 === 0 ? mpv.speed.toFixed(0) : mpv.speed.toString()) + "x"
-                        color: "white"
-                        font.family: win.uiFont
-                        font.pixelSize: 14
-                        font.bold: true
-                    }
+                Text {
+                    text: "Playback speed"
+                    color: Qt.rgba(1, 1, 1, 0.85)
+                    font.family: win.uiFont
+                    font.pixelSize: 14
+                    font.bold: true
                 }
-                Item {
-                    id: speedSlider
-                    width: parent.width
-                    height: 24
-                    readonly property real from: 0.25
-                    readonly property real to: 4
-                    readonly property real step: 0.25
-                    Rectangle {
-                        id: speedTrack
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width
-                        height: speedMa.containsMouse || speedMa.pressed ? 10 : 7
-                        radius: height / 2
-                        color: Qt.rgba(1, 1, 1, 0.22)
-                        Behavior on height { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.02 } }
+                Row {
+                    spacing: 8
+                    Repeater {
+                        model: [1.0, 1.25, 1.5, 2.0, 3.0]
                         Rectangle {
-                            width: parent.width * (mpv.speed - speedSlider.from) / (speedSlider.to - speedSlider.from)
-                            height: parent.height
-                            radius: parent.radius
-                            gradient: Gradient {
-                                orientation: Gradient.Horizontal
-                                GradientStop { position: 0; color: win.primarySoft }
-                                GradientStop { position: 1; color: win.primary }
+                            required property real modelData
+                            readonly property bool selected: Math.abs(mpv.speed - modelData) < 0.01
+                            width: speedChipText.implicitWidth + 24
+                            height: 34
+                            radius: 17
+                            color: selected
+                                ? Qt.rgba(win.primary.r, win.primary.g, win.primary.b, 0.85)
+                                : Qt.rgba(1, 1, 1, 0.12)
+                            border.color: Qt.rgba(1, 1, 1, selected ? 0.5 : 0.25)
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Text {
+                                id: speedChipText
+                                anchors.centerIn: parent
+                                text: Number.isInteger(parent.modelData)
+                                    ? parent.modelData.toFixed(1) : parent.modelData.toString()
+                                color: "white"
+                                font.family: win.uiFont
+                                font.bold: true
+                                font.pixelSize: 13
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: mpv.speed = parent.modelData
                             }
                         }
-                    }
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: speedTrack.width * (mpv.speed - speedSlider.from) / (speedSlider.to - speedSlider.from) - width / 2
-                        width: 14
-                        height: 14
-                        radius: 7
-                        color: "white"
-                    }
-                    MouseArea {
-                        id: speedMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                        function apply(mx) {
-                            const ratio = Math.max(0, Math.min(mx / width, 1));
-                            const raw = speedSlider.from + ratio * (speedSlider.to - speedSlider.from);
-                            mpv.speed = Math.round(raw / speedSlider.step) * speedSlider.step;
-                        }
-                        onPressed: (mouse) => apply(mouse.x)
-                        onPositionChanged: (mouse) => { if (pressed) apply(mouse.x); }
                     }
                 }
             }
