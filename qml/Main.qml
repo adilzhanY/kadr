@@ -50,6 +50,12 @@ Window {
         onPositionChanged: win.poke()
         onClicked: { mpv.togglePause(); win.poke(); }
         onDoubleClicked: win.toggleFullscreen()
+        onWheel: (wheel) => {
+            const step = wheel.angleDelta.y > 0 ? 5 : -5;
+            mpv.volume = Math.max(0, Math.min(130, mpv.volume + step));
+            win.showVolume();
+            win.poke();
+        }
     }
 
     function toggleFullscreen() {
@@ -141,7 +147,9 @@ Window {
         spacing: 34
         opacity: win.controlsShown ? 1 : 0
         visible: opacity > 0
+        scale: win.controlsShown ? 1 : 0.86
         Behavior on opacity { NumberAnimation { duration: 180 } }
+        Behavior on scale { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.004 } }
 
         SkipButton { forward: false; anchors.verticalCenter: parent.verticalCenter }
 
@@ -152,38 +160,51 @@ Window {
             color: Qt.rgba(win.primary.r, win.primary.g, win.primary.b, hovered ? 0.75 : 0.55)
             onActivated: mpv.togglePause()
 
-            Shape {
-                anchors.centerIn: parent
-                width: 24; height: 24
-                visible: mpv.pause
-                preferredRendererType: Shape.CurveRenderer
-                transform: Scale {
-                    origin.x: 12; origin.y: 12
-                    xScale: playBtn.diameter * 0.52 / 24
-                    yScale: playBtn.diameter * 0.52 / 24
-                }
-                ShapePath {
-                    strokeWidth: 1.6
-                    strokeColor: "white"
-                    fillColor: "white"
-                    joinStyle: ShapePath.RoundJoin
-                    capStyle: ShapePath.RoundCap
-                    PathSvg { path: "M7.3 6.9v10.2c0 .95 1.05 1.53 1.85 1.02l8-5.1c.74-.47.74-1.57 0-2.04l-8-5.1c-.8-.51-1.85.07-1.85 1.02z" }
-                }
-            }
-            Row {
-                anchors.centerIn: parent
-                visible: !mpv.pause
-                spacing: playBtn.diameter * 0.11
-                Repeater {
-                    model: 2
-                    Rectangle {
-                        width: playBtn.diameter * 0.13
-                        height: playBtn.diameter * 0.38
-                        radius: width / 2
-                        color: "white"
+            Item {
+                id: glyphBox
+                anchors.fill: parent
+                Shape {
+                    anchors.centerIn: parent
+                    width: 24; height: 24
+                    visible: mpv.pause
+                    preferredRendererType: Shape.CurveRenderer
+                    transform: Scale {
+                        origin.x: 12; origin.y: 12
+                        xScale: playBtn.diameter * 0.52 / 24
+                        yScale: playBtn.diameter * 0.52 / 24
+                    }
+                    ShapePath {
+                        strokeWidth: 1.6
+                        strokeColor: "white"
+                        fillColor: "white"
+                        joinStyle: ShapePath.RoundJoin
+                        capStyle: ShapePath.RoundCap
+                        PathSvg { path: "M7.3 6.9v10.2c0 .95 1.05 1.53 1.85 1.02l8-5.1c.74-.47.74-1.57 0-2.04l-8-5.1c-.8-.51-1.85.07-1.85 1.02z" }
                     }
                 }
+                Row {
+                    anchors.centerIn: parent
+                    visible: !mpv.pause
+                    spacing: playBtn.diameter * 0.11
+                    Repeater {
+                        model: 2
+                        Rectangle {
+                            width: playBtn.diameter * 0.13
+                            height: playBtn.diameter * 0.38
+                            radius: width / 2
+                            color: "white"
+                        }
+                    }
+                }
+            }
+            SequentialAnimation {
+                id: glyphPop
+                NumberAnimation { target: glyphBox; property: "scale"; to: 1.22; duration: 80; easing.type: Easing.OutQuad }
+                SpringAnimation { target: glyphBox; property: "scale"; to: 1; spring: 2.8; damping: 0.40; epsilon: 0.004 }
+            }
+            Connections {
+                target: mpv
+                function onPauseChanged() { glyphPop.restart() }
             }
         }
 
@@ -201,6 +222,10 @@ Window {
         spacing: 14
         opacity: win.controlsShown ? 1 : 0
         visible: opacity > 0
+        transform: Translate {
+            y: win.controlsShown ? 0 : 30
+            Behavior on y { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.02 } }
+        }
         Behavior on opacity { NumberAnimation { duration: 180 } }
 
         Text {
@@ -239,6 +264,29 @@ Window {
                         GradientStop { position: 0; color: win.primarySoft }
                         GradientStop { position: 1; color: win.primary }
                     }
+                    Behavior on width { NumberAnimation { duration: 150 } }
+                }
+            }
+            Rectangle {
+                id: seekPreview
+                visible: seekArea.active && mpv.duration > 0
+                x: Math.max(0, Math.min(seekMa.mouseX - width / 2, seekArea.width - width))
+                anchors.bottom: parent.top
+                anchors.bottomMargin: 10
+                width: previewText.implicitWidth + 26
+                height: previewText.implicitHeight + 12
+                radius: height / 2
+                color: Qt.rgba(0, 0, 0, 0.55)
+                border.color: Qt.rgba(1, 1, 1, 0.30)
+                border.width: 1
+                Text {
+                    id: previewText
+                    anchors.centerIn: parent
+                    text: win.fmt(seekMa.mouseX / seekArea.width * mpv.duration)
+                    color: "white"
+                    font.family: win.uiFont
+                    font.bold: true
+                    font.pixelSize: 13
                 }
             }
             Rectangle {
@@ -309,6 +357,60 @@ Window {
         }
     }
 
+    // ---- Volume OSD ------------------------------------------------------
+
+    function showVolume() {
+        volumeOsd.opacity = 1;
+        volumeOsdTimer.restart();
+    }
+    Timer {
+        id: volumeOsdTimer
+        interval: 1200
+        onTriggered: volumeOsd.opacity = 0
+    }
+    Rectangle {
+        id: volumeOsd
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 22
+        width: volRow.implicitWidth + 34
+        height: 40
+        radius: 20
+        color: Qt.rgba(0, 0, 0, 0.55)
+        border.color: Qt.rgba(1, 1, 1, 0.30)
+        border.width: 1
+        opacity: 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Row {
+            id: volRow
+            anchors.centerIn: parent
+            spacing: 10
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: mpv.mute ? "Muted" : "Volume " + Math.round(mpv.volume) + "%"
+                color: "white"
+                font.family: win.uiFont
+                font.bold: true
+                font.pixelSize: 14
+            }
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 70
+                height: 6
+                radius: 3
+                color: Qt.rgba(1, 1, 1, 0.22)
+                Rectangle {
+                    width: parent.width * Math.min(mpv.volume, 100) / 100
+                    height: parent.height
+                    radius: parent.radius
+                    color: mpv.mute ? Qt.rgba(1, 1, 1, 0.4) : win.primary
+                    Behavior on width { NumberAnimation { duration: 120 } }
+                }
+            }
+        }
+    }
+
     // ---- Keyboard --------------------------------------------------------
 
     Item {
@@ -319,10 +421,10 @@ Window {
             case Qt.Key_Space: mpv.togglePause(); break;
             case Qt.Key_Left: mpv.seekBy(-5); break;
             case Qt.Key_Right: mpv.seekBy(5); break;
-            case Qt.Key_Down: mpv.volume = Math.max(0, mpv.volume - 5); break;
-            case Qt.Key_Up: mpv.volume = Math.min(130, mpv.volume + 5); break;
+            case Qt.Key_Down: mpv.volume = Math.max(0, mpv.volume - 5); win.showVolume(); break;
+            case Qt.Key_Up: mpv.volume = Math.min(130, mpv.volume + 5); win.showVolume(); break;
             case Qt.Key_F: win.toggleFullscreen(); break;
-            case Qt.Key_M: mpv.mute = !mpv.mute; break;
+            case Qt.Key_M: mpv.mute = !mpv.mute; win.showVolume(); break;
             case Qt.Key_S: mpv.subVisible = !mpv.subVisible; break;
             case Qt.Key_Escape: win.visibility = Window.Windowed; break;
             case Qt.Key_Q: Qt.quit(); break;
