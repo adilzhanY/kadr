@@ -12,7 +12,8 @@ layout(std140, binding = 0) uniform buf {
     mat4 qt_Matrix;
     float qt_Opacity;
     vec2 fullSize;              // item size in px
-    vec2 uvPadding;             // fraction of the captured texture that is padding
+    vec2 srcOrigin;             // item origin in normalized video-texture coords
+    vec2 srcSpan;               // item size in normalized video-texture coords
     float radius;               // corner radius in px
     float roundingPower;
     float edgeThickness;
@@ -34,13 +35,11 @@ layout(std140, binding = 0) uniform buf {
 
 layout(binding = 1) uniform sampler2D source;
 
-// window UV -> padded texture UV
-vec2 toTexUV(vec2 wuv) {
-    return wuv * (1.0 - 2.0 * u.uvPadding) + u.uvPadding;
-}
-
+// item UV -> video texture UV; offsets outside [0,1] naturally read the real
+// neighboring video pixels instead of a clamped padding border
 vec4 sampleBlurred(vec2 wuv) {
-    return texture(source, clamp(toTexUV(wuv), 0.001, 0.999));
+    vec2 vuv = u.srcOrigin + wuv * u.srcSpan;
+    return texture(source, clamp(vuv, 0.001, 0.999));
 }
 
 float lpNorm(vec2 v, float p) {

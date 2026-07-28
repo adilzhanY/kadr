@@ -3,13 +3,15 @@ import QtQuick
 // Liquid Glass surface: refracts the video underneath through the hyprglass
 // lens shader. Defaults mirror the lglass preset in
 // ~/.config/end4-themes/lglass/on-reload.sh so kadr's glass matches the shell.
+//
+// The shader samples the video item's texture directly (an FBO item is a
+// texture provider) - no ShaderEffectSource, no per-frame copy passes.
 Item {
     id: root
 
     required property Item videoSource
     property real cornerRadius: height / 2
     property real roundingPower: 2.0
-    property real paddingPx: 26
     property color tint: Qt.rgba(0, 0, 0, 0)
 
     property real refractionStrength: 1.0
@@ -27,18 +29,20 @@ Item {
     property real adaptiveDim: 0.0
     property real adaptiveBoost: 0.0
 
-    // Region of the video under this item, expanded so edge refraction has
-    // pixels to bend inward. mapToItem gives QML bindings nothing to track
-    // (ancestor moves, Row layout, reveal animations), so the rect is re-synced
-    // every frame right before the scene graph syncs.
-    property rect captureRect: Qt.rect(0, 0, 1, 1)
+    // This item's rect in normalized video-texture coordinates. mapToItem
+    // gives QML bindings nothing to track (ancestor moves, Row layout, reveal
+    // animations), so it is re-synced every frame before the scene graph syncs.
+    property vector2d srcOrigin: Qt.vector2d(0, 0)
+    property vector2d srcSpan: Qt.vector2d(1, 1)
 
     function syncRect() {
-        const p = root.mapToItem(videoSource, -paddingPx, -paddingPx);
-        const r = Qt.rect(p.x, p.y, width + 2 * paddingPx, height + 2 * paddingPx);
-        if (r.x !== captureRect.x || r.y !== captureRect.y
-                || r.width !== captureRect.width || r.height !== captureRect.height)
-            captureRect = r;
+        if (videoSource.width <= 0 || videoSource.height <= 0)
+            return;
+        const p = root.mapToItem(videoSource, 0, 0);
+        const o = Qt.vector2d(p.x / videoSource.width, p.y / videoSource.height);
+        const s = Qt.vector2d(width / videoSource.width, height / videoSource.height);
+        if (o !== srcOrigin) srcOrigin = o;
+        if (s !== srcSpan) srcSpan = s;
     }
 
     Component.onCompleted: syncRect()
@@ -47,24 +51,14 @@ Item {
         function onAfterAnimating() { root.syncRect() }
     }
 
-    ShaderEffectSource {
-        id: capture
-        sourceItem: root.videoSource
-        sourceRect: root.captureRect
-        live: true
-        visible: false
-        smooth: true
-    }
-
     ShaderEffect {
         anchors.fill: parent
         fragmentShader: "qrc:/kadr/shaders/glass.frag.qsb"
 
-        property var source: capture
+        property var source: root.videoSource
         property size fullSize: Qt.size(root.width, root.height)
-        property size uvPadding: Qt.size(
-            root.paddingPx / (root.width + 2 * root.paddingPx),
-            root.paddingPx / (root.height + 2 * root.paddingPx))
+        property vector2d srcOrigin: root.srcOrigin
+        property vector2d srcSpan: root.srcSpan
         property real radius: root.cornerRadius
         property real roundingPower: root.roundingPower
         property real edgeThickness: root.edgeThickness

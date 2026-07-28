@@ -26,6 +26,8 @@ int main(int argc, char *argv[])
         QStringLiteral("smokeTest"), qEnvironmentVariableIsSet("KADR_SMOKE"));
     engine.rootContext()->setContextProperty(
         QStringLiteral("shotPath"), qEnvironmentVariable("KADR_SHOT"));
+    engine.rootContext()->setContextProperty(
+        QStringLiteral("holdControls"), qEnvironmentVariableIsSet("KADR_HOLD_CONTROLS"));
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);

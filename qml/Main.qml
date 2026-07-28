@@ -25,8 +25,9 @@ Window {
     Timer {
         id: hideTimer
         interval: 2600
-        onTriggered: if (!mpv.pause && !win.settingsOpen) win.controlsShown = false
+        onTriggered: if (!mpv.pause && !win.settingsOpen && !holdControls) win.controlsShown = false
     }
+    Component.onCompleted: if (holdControls) win.settingsOpen = true
 
     function fmt(s) {
         if (isNaN(s) || s < 0) s = 0;
@@ -403,7 +404,6 @@ Window {
             anchors.fill: parent
             videoSource: mpv
             cornerRadius: 24
-            paddingPx: 40
             tint: Qt.rgba(0, 0, 0, 0.45)
         }
         Rectangle {
