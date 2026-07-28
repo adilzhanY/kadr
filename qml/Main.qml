@@ -16,6 +16,8 @@ Window {
     readonly property string uiFont: "SF Pro Rounded"
 
     property bool controlsShown: true
+    property bool settingsOpen: false
+    property int skipInterval: 10
     function poke() {
         controlsShown = true;
         hideTimer.restart();
@@ -23,7 +25,7 @@ Window {
     Timer {
         id: hideTimer
         interval: 2600
-        onTriggered: if (!mpv.pause) win.controlsShown = false
+        onTriggered: if (!mpv.pause && !win.settingsOpen) win.controlsShown = false
     }
 
     function fmt(s) {
@@ -48,7 +50,13 @@ Window {
         hoverEnabled: true
         cursorShape: win.controlsShown ? Qt.ArrowCursor : Qt.BlankCursor
         onPositionChanged: win.poke()
-        onClicked: { mpv.togglePause(); win.poke(); }
+        onClicked: {
+            if (win.settingsOpen)
+                win.settingsOpen = false;
+            else
+                mpv.togglePause();
+            win.poke();
+        }
         onDoubleClicked: win.toggleFullscreen()
         onWheel: (wheel) => {
             const step = wheel.angleDelta.y > 0 ? 5 : -5;
@@ -127,7 +135,7 @@ Window {
             }
             Text {
                 anchors.centerIn: parent
-                text: "10"
+                text: win.skipInterval
                 color: "white"
                 font.family: win.uiFont
                 font.bold: true
@@ -145,7 +153,7 @@ Window {
         }
         onActivated: {
             spinAnim.restart();
-            mpv.seekBy(forward ? 10 : -10);
+            mpv.seekBy(forward ? win.skipInterval : -win.skipInterval);
         }
     }
 
@@ -360,7 +368,7 @@ Window {
 
         GlassButton {
             diameter: 40
-            onActivated: {} // settings panel arrives in P3
+            onActivated: win.settingsOpen = !win.settingsOpen
             Shape {
                 anchors.centerIn: parent
                 width: 24; height: 24
@@ -370,6 +378,172 @@ Window {
                     strokeColor: "transparent"
                     fillColor: "white"
                     PathSvg { path: "M19.14 12.94a7.5 7.5 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.5 7.5 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.49.38 1.03.7 1.62.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54a7.3 7.3 0 0 0 1.62-.94l2.39.96c.21.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z" }
+                }
+            }
+        }
+    }
+
+    // ---- Settings panel --------------------------------------------------
+
+    Item {
+        id: settingsPanel
+        anchors.bottom: bottomBar.top
+        anchors.bottomMargin: 16
+        anchors.right: bottomBar.right
+        width: 330
+        height: panelCol.implicitHeight + 44
+        transformOrigin: Item.BottomRight
+        opacity: win.settingsOpen ? 1 : 0
+        scale: win.settingsOpen ? 1 : 0.85
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 160 } }
+        Behavior on scale { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.004 } }
+
+        GlassItem {
+            anchors.fill: parent
+            videoSource: mpv
+            cornerRadius: 24
+            paddingPx: 40
+            tint: Qt.rgba(0, 0, 0, 0.45)
+        }
+        Rectangle {
+            anchors.fill: parent
+            radius: 24
+            color: "transparent"
+            border.color: Qt.rgba(1, 1, 1, 0.28)
+            border.width: 1
+        }
+        MouseArea {
+            // swallow clicks so the panel doesn't toggle pause underneath
+            anchors.fill: parent
+            hoverEnabled: true
+            onPositionChanged: win.poke()
+        }
+
+        Column {
+            id: panelCol
+            anchors.centerIn: parent
+            width: parent.width - 44
+            spacing: 18
+
+            // -- Playback speed --
+            Column {
+                width: parent.width
+                spacing: 10
+                Item {
+                    width: parent.width
+                    height: speedTitle.implicitHeight
+                    Text {
+                        id: speedTitle
+                        anchors.left: parent.left
+                        text: "Playback speed"
+                        color: Qt.rgba(1, 1, 1, 0.85)
+                        font.family: win.uiFont
+                        font.pixelSize: 14
+                        font.bold: true
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        text: (mpv.speed % 1 === 0 ? mpv.speed.toFixed(0) : mpv.speed.toString()) + "x"
+                        color: "white"
+                        font.family: win.uiFont
+                        font.pixelSize: 14
+                        font.bold: true
+                    }
+                }
+                Item {
+                    id: speedSlider
+                    width: parent.width
+                    height: 24
+                    readonly property real from: 0.25
+                    readonly property real to: 4
+                    readonly property real step: 0.25
+                    Rectangle {
+                        id: speedTrack
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width
+                        height: speedMa.containsMouse || speedMa.pressed ? 10 : 7
+                        radius: height / 2
+                        color: Qt.rgba(1, 1, 1, 0.22)
+                        Behavior on height { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.02 } }
+                        Rectangle {
+                            width: parent.width * (mpv.speed - speedSlider.from) / (speedSlider.to - speedSlider.from)
+                            height: parent.height
+                            radius: parent.radius
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0; color: win.primarySoft }
+                                GradientStop { position: 1; color: win.primary }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: speedTrack.width * (mpv.speed - speedSlider.from) / (speedSlider.to - speedSlider.from) - width / 2
+                        width: 14
+                        height: 14
+                        radius: 7
+                        color: "white"
+                    }
+                    MouseArea {
+                        id: speedMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                        function apply(mx) {
+                            const ratio = Math.max(0, Math.min(mx / width, 1));
+                            const raw = speedSlider.from + ratio * (speedSlider.to - speedSlider.from);
+                            mpv.speed = Math.round(raw / speedSlider.step) * speedSlider.step;
+                        }
+                        onPressed: (mouse) => apply(mouse.x)
+                        onPositionChanged: (mouse) => { if (pressed) apply(mouse.x); }
+                    }
+                }
+            }
+
+            // -- Skip interval --
+            Column {
+                width: parent.width
+                spacing: 10
+                Text {
+                    text: "Skip interval"
+                    color: Qt.rgba(1, 1, 1, 0.85)
+                    font.family: win.uiFont
+                    font.pixelSize: 14
+                    font.bold: true
+                }
+                Row {
+                    spacing: 10
+                    Repeater {
+                        model: [2, 5, 10]
+                        Rectangle {
+                            required property int modelData
+                            readonly property bool selected: win.skipInterval === modelData
+                            width: 62
+                            height: 34
+                            radius: 17
+                            color: selected
+                                ? Qt.rgba(win.primary.r, win.primary.g, win.primary.b, 0.85)
+                                : Qt.rgba(1, 1, 1, 0.12)
+                            border.color: Qt.rgba(1, 1, 1, selected ? 0.5 : 0.25)
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Text {
+                                anchors.centerIn: parent
+                                text: parent.modelData + "s"
+                                color: "white"
+                                font.family: win.uiFont
+                                font.bold: true
+                                font.pixelSize: 14
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: win.skipInterval = parent.modelData
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -444,7 +618,12 @@ Window {
             case Qt.Key_F: win.toggleFullscreen(); break;
             case Qt.Key_M: mpv.mute = !mpv.mute; win.showVolume(); break;
             case Qt.Key_S: mpv.subVisible = !mpv.subVisible; break;
-            case Qt.Key_Escape: win.visibility = Window.Windowed; break;
+            case Qt.Key_Escape:
+                if (win.settingsOpen)
+                    win.settingsOpen = false;
+                else
+                    win.visibility = Window.Windowed;
+                break;
             case Qt.Key_Q: Qt.quit(); break;
             default: return;
             }
@@ -461,7 +640,7 @@ Window {
             const frames = mpv.updateCount();
             if (mpv.duration > 0 && frames > 30) {
                 console.log("KADR_SMOKE_OK duration=" + mpv.duration + " frames=" + frames
-                            + " primary=" + win.primary + " dark=" + Theme.dark);
+                            + " speed=" + mpv.speed + " primary=" + win.primary + " dark=" + Theme.dark);
                 if (shotPath !== "") {
                     mpv.seek(780);
                     shotTimer.start();
@@ -480,16 +659,20 @@ Window {
         onTriggered: {
             hideTimer.stop();
             win.controlsShown = true;
+            win.settingsOpen = true;
             grabTimer.start();
         }
     }
     Timer {
         id: grabTimer
         interval: 450
-        onTriggered: win.contentItem.grabToImage((result) => {
-            result.saveToFile(shotPath);
-            console.log("KADR_SHOT_SAVED " + shotPath);
-            Qt.quit();
-        })
+        onTriggered: {
+            console.log("KADR_SHOT_PRE speed=" + mpv.speed);
+            win.contentItem.grabToImage((result) => {
+                result.saveToFile(shotPath);
+                console.log("KADR_SHOT_SAVED " + shotPath + " speed=" + mpv.speed);
+                Qt.quit();
+            });
+        }
     }
 }

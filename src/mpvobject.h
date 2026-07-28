@@ -16,6 +16,7 @@ class MpvObject : public QQuickFramebufferObject
     Q_PROPERTY(double duration READ duration NOTIFY durationChanged)
     Q_PROPERTY(bool pause READ pause WRITE setPause NOTIFY pauseChanged)
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
+    Q_PROPERTY(double speed READ speed WRITE setSpeed NOTIFY speedChanged)
     Q_PROPERTY(bool mute READ mute WRITE setMute NOTIFY muteChanged)
     Q_PROPERTY(bool subVisible READ subVisible WRITE setSubVisible NOTIFY subVisibleChanged)
     Q_PROPERTY(QString mediaTitle READ mediaTitle NOTIFY mediaTitleChanged)
@@ -30,12 +31,14 @@ public:
     double duration() const { return m_duration; }
     bool pause() const { return m_pause; }
     double volume() const { return m_volume; }
+    double speed() const { return m_speed; }
     bool mute() const { return m_mute; }
     bool subVisible() const { return m_subVisible; }
     QString mediaTitle() const { return m_mediaTitle; }
 
     void setPause(bool on);
     void setVolume(double vol);
+    void setSpeed(double speed);
     void setMute(bool on);
     void setSubVisible(bool on);
 
@@ -53,6 +56,7 @@ signals:
     void durationChanged();
     void pauseChanged();
     void volumeChanged();
+    void speedChanged();
     void muteChanged();
     void subVisibleChanged();
     void mediaTitleChanged();
@@ -72,6 +76,7 @@ private:
     double m_position = 0;
     double m_duration = 0;
     double m_volume = 100;
+    double m_speed = 1.0;
     bool m_pause = true;
     bool m_mute = false;
     bool m_subVisible = true;

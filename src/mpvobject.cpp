@@ -101,6 +101,7 @@ MpvObject::MpvObject(QQuickItem *parent)
     mpv_observe_property(m_mpv, 0, "duration", MPV_FORMAT_DOUBLE);
     mpv_observe_property(m_mpv, 0, "pause", MPV_FORMAT_FLAG);
     mpv_observe_property(m_mpv, 0, "volume", MPV_FORMAT_DOUBLE);
+    mpv_observe_property(m_mpv, 0, "speed", MPV_FORMAT_DOUBLE);
     mpv_observe_property(m_mpv, 0, "mute", MPV_FORMAT_FLAG);
     mpv_observe_property(m_mpv, 0, "sub-visibility", MPV_FORMAT_FLAG);
     mpv_observe_property(m_mpv, 0, "media-title", MPV_FORMAT_STRING);
@@ -179,6 +180,11 @@ void MpvObject::setVolume(double vol)
     setMpvProperty("volume", qBound(0.0, vol, 130.0));
 }
 
+void MpvObject::setSpeed(double speed)
+{
+    setMpvProperty("speed", qBound(0.25, speed, 4.0));
+}
+
 void MpvObject::setMute(bool on)
 {
     setMpvProperty("mute", on);
@@ -243,6 +249,9 @@ void MpvObject::handleEvents()
             } else if (name == "volume" && prop->format == MPV_FORMAT_DOUBLE) {
                 m_volume = *static_cast<double *>(prop->data);
                 emit volumeChanged();
+            } else if (name == "speed" && prop->format == MPV_FORMAT_DOUBLE) {
+                m_speed = *static_cast<double *>(prop->data);
+                emit speedChanged();
             } else if (name == "mute" && prop->format == MPV_FORMAT_FLAG) {
                 m_mute = *static_cast<int *>(prop->data);
                 emit muteChanged();
