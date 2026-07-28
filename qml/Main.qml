@@ -91,6 +91,7 @@ Window {
             id: ma
             anchors.fill: parent
             hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onClicked: { gbtn.activated(); win.poke(); }
         }
     }
@@ -265,14 +266,22 @@ Window {
                     id: fill
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
-                    width: mpv.duration > 0 ? parent.width * mpv.position / mpv.duration : 0
+                    // While dragging, track the cursor directly; otherwise follow
+                    // playback with a short glide.
+                    property real shownRatio: seekMa.pressed
+                        ? Math.max(0, Math.min(seekMa.mouseX / seekArea.width, 1))
+                        : (mpv.duration > 0 ? mpv.position / mpv.duration : 0)
+                    width: parent.width * shownRatio
                     radius: parent.radius
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
                         GradientStop { position: 0; color: win.primarySoft }
                         GradientStop { position: 1; color: win.primary }
                     }
-                    Behavior on width { NumberAnimation { duration: 150 } }
+                    Behavior on width {
+                        enabled: !seekMa.pressed
+                        NumberAnimation { duration: 150 }
+                    }
                 }
             }
             Rectangle {
@@ -312,6 +321,7 @@ Window {
                 id: seekMa
                 anchors.fill: parent
                 hoverEnabled: true
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                 onPressed: (mouse) => mpv.seek(mouse.x / width * mpv.duration)
                 onPositionChanged: (mouse) => {
                     win.poke();
