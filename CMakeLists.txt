@@ -28,7 +28,7 @@ qt_add_qml_module(kadr
 
 qt_add_shaders(kadr "kadr_shaders"
     PREFIX "/kadr"
-    FILES shaders/glass.frag
+    FILES shaders/glass.frag shaders/rounded.frag
 )
 
 target_include_directories(kadr PRIVATE src)

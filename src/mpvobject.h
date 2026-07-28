@@ -20,6 +20,9 @@ class MpvObject : public QQuickFramebufferObject
     Q_PROPERTY(bool mute READ mute WRITE setMute NOTIFY muteChanged)
     Q_PROPERTY(bool subVisible READ subVisible WRITE setSubVisible NOTIFY subVisibleChanged)
     Q_PROPERTY(QString mediaTitle READ mediaTitle NOTIFY mediaTitleChanged)
+    // Set once at creation: a muted, paused, keyframe-seeking side instance
+    // used for timeline thumbnails.
+    Q_PROPERTY(bool thumbnailMode READ thumbnailMode WRITE setThumbnailMode)
 
 public:
     explicit MpvObject(QQuickItem *parent = nullptr);
@@ -35,6 +38,9 @@ public:
     bool mute() const { return m_mute; }
     bool subVisible() const { return m_subVisible; }
     QString mediaTitle() const { return m_mediaTitle; }
+
+    bool thumbnailMode() const { return m_thumbnailMode; }
+    void setThumbnailMode(bool on) { m_thumbnailMode = on; }
 
     void setPause(bool on);
     void setVolume(double vol);
@@ -62,10 +68,15 @@ signals:
     void mediaTitleChanged();
     void fileLoaded();
 
+protected:
+    void componentComplete() override;
+
 private:
+    void initMpv();
     void handleEvents();
     void renderContextReady();
     void setMpvProperty(const char *name, const QVariant &value);
+    bool m_thumbnailMode = false;
 
     mpv_handle *m_mpv = nullptr;
     mpv_render_context *m_renderCtx = nullptr;

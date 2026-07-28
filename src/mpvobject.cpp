@@ -76,6 +76,16 @@ private:
 MpvObject::MpvObject(QQuickItem *parent)
     : QQuickFramebufferObject(parent)
 {
+}
+
+void MpvObject::componentComplete()
+{
+    QQuickFramebufferObject::componentComplete();
+    initMpv();
+}
+
+void MpvObject::initMpv()
+{
     m_mpv = mpv_create();
     if (!m_mpv)
         throw std::runtime_error("kadr: failed to create mpv instance");
@@ -94,6 +104,20 @@ MpvObject::MpvObject(QQuickItem *parent)
     // Recommended companion to BLOCK_FOR_TARGET_TIME=0: don't schedule video
     // frames ahead of audio by the default 50ms interpolation offset.
     mpv_set_option_string(m_mpv, "video-timing-offset", "0");
+
+    if (m_thumbnailMode) {
+        // Cheap side instance: paused, silent, keyframe seeks, software
+        // decode (no second NVDEC pool), minimal demuxer cache.
+        mpv_set_option_string(m_mpv, "hwdec", "no");
+        mpv_set_option_string(m_mpv, "pause", "yes");
+        mpv_set_option_string(m_mpv, "mute", "yes");
+        mpv_set_option_string(m_mpv, "aid", "no");
+        mpv_set_option_string(m_mpv, "sid", "no");
+        mpv_set_option_string(m_mpv, "hr-seek", "no");
+        mpv_set_option_string(m_mpv, "vd-lavc-skiploopfilter", "all");
+        mpv_set_option_string(m_mpv, "demuxer-max-bytes", "16MiB");
+        mpv_set_option_string(m_mpv, "demuxer-readahead-secs", "0");
+    }
     mpv_set_option_string(m_mpv, "keep-open", "yes");
 
     // Same subtitle look the mentalist script used, rendered by libass.
@@ -106,14 +130,16 @@ MpvObject::MpvObject(QQuickItem *parent)
 
     mpv_request_log_messages(m_mpv, "warn");
 
-    mpv_observe_property(m_mpv, 0, "time-pos", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(m_mpv, 0, "duration", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(m_mpv, 0, "pause", MPV_FORMAT_FLAG);
-    mpv_observe_property(m_mpv, 0, "volume", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(m_mpv, 0, "speed", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(m_mpv, 0, "mute", MPV_FORMAT_FLAG);
-    mpv_observe_property(m_mpv, 0, "sub-visibility", MPV_FORMAT_FLAG);
-    mpv_observe_property(m_mpv, 0, "media-title", MPV_FORMAT_STRING);
+    if (!m_thumbnailMode) {
+        mpv_observe_property(m_mpv, 0, "time-pos", MPV_FORMAT_DOUBLE);
+        mpv_observe_property(m_mpv, 0, "duration", MPV_FORMAT_DOUBLE);
+        mpv_observe_property(m_mpv, 0, "pause", MPV_FORMAT_FLAG);
+        mpv_observe_property(m_mpv, 0, "volume", MPV_FORMAT_DOUBLE);
+        mpv_observe_property(m_mpv, 0, "speed", MPV_FORMAT_DOUBLE);
+        mpv_observe_property(m_mpv, 0, "mute", MPV_FORMAT_FLAG);
+        mpv_observe_property(m_mpv, 0, "sub-visibility", MPV_FORMAT_FLAG);
+        mpv_observe_property(m_mpv, 0, "media-title", MPV_FORMAT_STRING);
+    }
 
     mpv_set_wakeup_callback(
         m_mpv,
@@ -128,7 +154,8 @@ MpvObject::~MpvObject()
 {
     if (m_renderCtx)
         mpv_render_context_free(m_renderCtx);
-    mpv_terminate_destroy(m_mpv);
+    if (m_mpv)
+        mpv_terminate_destroy(m_mpv);
 }
 
 QQuickFramebufferObject::Renderer *MpvObject::createRenderer() const
@@ -167,6 +194,8 @@ void MpvObject::seekBy(double secs)
 
 void MpvObject::command(const QStringList &args)
 {
+    if (!m_mpv)
+        return;
     QList<QByteArray> utf8;
     utf8.reserve(args.size());
     QVector<const char *> argv;
@@ -206,6 +235,8 @@ void MpvObject::setSubVisible(bool on)
 
 void MpvObject::setMpvProperty(const char *name, const QVariant &value)
 {
+    if (!m_mpv)
+        return;
     switch (value.typeId()) {
     case QMetaType::Bool: {
         int flag = value.toBool() ? 1 : 0;

@@ -18,6 +18,7 @@ Window {
 
     property bool controlsShown: true
     property bool settingsOpen: false
+    property bool previewForced: false   // KADR_SHOT verification only
     property int skipInterval: 10
     property string glassTheme: "liquid"
 
@@ -316,24 +317,79 @@ Window {
             }
             Rectangle {
                 id: seekPreview
-                visible: seekArea.active && mpv.duration > 0
+                readonly property bool showing: (seekArea.active || win.previewForced) && mpv.duration > 0
+                readonly property real hoverRatio: Math.max(0, Math.min(seekMa.mouseX / seekArea.width, 1))
+                readonly property real hoverTime: hoverRatio * mpv.duration
+                property real thumbLastSeek: -1
+
+                visible: opacity > 0
+                opacity: showing ? 1 : 0
+                scale: showing ? 1 : 0.82
+                transformOrigin: Item.Bottom
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+                Behavior on scale { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.004 } }
+
                 x: Math.max(0, Math.min(seekMa.mouseX - width / 2, seekArea.width - width))
                 anchors.bottom: parent.top
-                anchors.bottomMargin: 10
-                width: previewText.implicitWidth + 26
-                height: previewText.implicitHeight + 12
-                radius: height / 2
+                anchors.bottomMargin: 12
+                width: 210
+                height: 146
+                radius: 14
                 color: Qt.rgba(0, 0, 0, 0.55)
                 border.color: Qt.rgba(1, 1, 1, 0.30)
                 border.width: 1
+
+                onShowingChanged: {
+                    if (showing && seekArea.active) {
+                        thumbMpv.seek(hoverTime);
+                        thumbLastSeek = hoverTime;
+                    }
+                }
+
+                Item {
+                    x: 5
+                    y: 5
+                    width: 200
+                    height: 113
+                    MpvObject {
+                        id: thumbMpv
+                        thumbnailMode: true
+                        anchors.fill: parent
+                        Component.onCompleted: if (cliFile !== "") loadFile(cliFile)
+                    }
+                    ShaderEffectSource {
+                        id: thumbSrc
+                        sourceItem: thumbMpv
+                        hideSource: true
+                        live: true
+                    }
+                    ShaderEffect {
+                        anchors.fill: parent
+                        fragmentShader: "qrc:/kadr/shaders/rounded.frag.qsb"
+                        property var source: thumbSrc
+                        property size size: Qt.size(width, height)
+                        property real radius: 10
+                    }
+                }
                 Text {
-                    id: previewText
-                    anchors.centerIn: parent
-                    text: win.fmt(seekMa.mouseX / seekArea.width * mpv.duration)
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 5
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: win.fmt(seekPreview.hoverTime)
                     color: "white"
                     font.family: win.uiFont
                     font.bold: true
                     font.pixelSize: 13
+                }
+                Timer {
+                    id: thumbThrottle
+                    interval: 80
+                    onTriggered: {
+                        if (Math.abs(seekPreview.hoverTime - seekPreview.thumbLastSeek) > 0.5) {
+                            thumbMpv.seek(seekPreview.hoverTime);
+                            seekPreview.thumbLastSeek = seekPreview.hoverTime;
+                        }
+                    }
                 }
             }
             Rectangle {
@@ -357,6 +413,8 @@ Window {
                     win.poke();
                     if (pressed)
                         mpv.seek(Math.max(0, Math.min(mouse.x / width, 1)) * mpv.duration);
+                    if (seekPreview.showing && !thumbThrottle.running)
+                        thumbThrottle.start();
                 }
             }
         }
@@ -737,12 +795,21 @@ Window {
             hideTimer.stop();
             win.controlsShown = true;
             win.settingsOpen = true;
+            win.previewForced = true;
+            shotThumbTimer.start();
+        }
+    }
+    Timer {
+        id: shotThumbTimer
+        interval: 700
+        onTriggered: {
+            thumbMpv.seek(795);
             grabTimer.start();
         }
     }
     Timer {
         id: grabTimer
-        interval: 450
+        interval: 700
         onTriggered: {
             console.log("KADR_SHOT_PRE speed=" + mpv.speed);
             win.contentItem.grabToImage((result) => {
