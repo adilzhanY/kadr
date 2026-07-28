@@ -12,6 +12,7 @@ int main(int argc, char *argv[])
 
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("kadr"));
+    QGuiApplication::setOrganizationName(QStringLiteral("kadr"));
     QGuiApplication::setDesktopFileName(QStringLiteral("kadr"));
 
     // libmpv requires the C numeric locale; Qt may have changed it above.

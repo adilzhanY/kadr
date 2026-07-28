@@ -1,3 +1,4 @@
+import QtCore
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
@@ -18,7 +19,20 @@ Window {
     property bool controlsShown: true
     property bool settingsOpen: false
     property int skipInterval: 10
-    property string glassTheme: envTheme !== "" ? envTheme : "liquid"
+    property string glassTheme: "liquid"
+
+    Settings {
+        id: store
+        property string glassTheme: "liquid"
+        property int skipInterval: 10
+        property real speed: 1.0
+    }
+    onGlassThemeChanged: if (envTheme === "") store.glassTheme = glassTheme
+    onSkipIntervalChanged: store.skipInterval = skipInterval
+    Connections {
+        target: mpv
+        function onSpeedChanged() { store.speed = mpv.speed }
+    }
     function poke() {
         controlsShown = true;
         hideTimer.restart();
@@ -28,7 +42,12 @@ Window {
         interval: 2600
         onTriggered: if (!mpv.pause && !win.settingsOpen && !holdControls) win.controlsShown = false
     }
-    Component.onCompleted: if (holdControls) win.settingsOpen = true
+    Component.onCompleted: {
+        skipInterval = store.skipInterval;
+        glassTheme = envTheme !== "" ? envTheme : store.glassTheme;
+        mpv.speed = store.speed;
+        if (holdControls) settingsOpen = true;
+    }
 
     function fmt(s) {
         if (isNaN(s) || s < 0) s = 0;
@@ -693,7 +712,8 @@ Window {
             const frames = mpv.updateCount();
             if (mpv.duration > 0 && frames > 30) {
                 console.log("KADR_SMOKE_OK duration=" + mpv.duration + " frames=" + frames
-                            + " speed=" + mpv.speed + " primary=" + win.primary + " dark=" + Theme.dark);
+                            + " speed=" + mpv.speed + " theme=" + win.glassTheme
+                            + " skip=" + win.skipInterval + " primary=" + win.primary + " dark=" + Theme.dark);
                 if (shotPath !== "") {
                     mpv.seek(780);
                     shotTimer.start();
