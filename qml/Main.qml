@@ -100,6 +100,7 @@ Window {
         signal activated()
         property real diameter: 56
         property bool hovered: ma.containsMouse
+        property bool pressed: ma.pressed
         property color tint: Qt.rgba(0, 0, 0, ma.containsMouse ? 0.20 : 0.10)
         width: diameter
         height: diameter
@@ -130,6 +131,28 @@ Window {
     component SkipButton: GlassButton {
         id: skipBtn
         property bool forward: true
+
+        // Keyboard skips replay the full click feedback: press dip + ring spin.
+        property real pulse: 1
+        transform: Scale {
+            origin.x: skipBtn.width / 2
+            origin.y: skipBtn.height / 2
+            xScale: skipBtn.pulse
+            yScale: skipBtn.pulse
+        }
+        SequentialAnimation {
+            id: pressPulse
+            NumberAnimation { target: skipBtn; property: "pulse"; to: 0.88; duration: 70; easing.type: Easing.OutQuad }
+            SpringAnimation { target: skipBtn; property: "pulse"; to: 1; spring: 2.8; damping: 0.40; epsilon: 0.004 }
+        }
+        function doSkip() {
+            spinAnim.restart();
+            mpv.seekBy(forward ? win.skipInterval : -win.skipInterval);
+        }
+        function trigger() {
+            pressPulse.restart();
+            doSkip();
+        }
         Item {
             id: skipIcon
             anchors.centerIn: parent
@@ -174,10 +197,7 @@ Window {
             duration: 700
             easing.type: Easing.OutCubic
         }
-        onActivated: {
-            spinAnim.restart();
-            mpv.seekBy(forward ? win.skipInterval : -win.skipInterval);
-        }
+        onActivated: doSkip()
     }
 
     // ---- Center transport cluster ---------------------------------------
@@ -192,7 +212,7 @@ Window {
         Behavior on opacity { NumberAnimation { duration: 180 } }
         Behavior on scale { SpringAnimation { spring: 2.8; damping: 0.40; epsilon: 0.004 } }
 
-        SkipButton { forward: false; anchors.verticalCenter: parent.verticalCenter }
+        SkipButton { id: skipBack; forward: false; anchors.verticalCenter: parent.verticalCenter }
 
         GlassButton {
             id: playBtn
@@ -248,7 +268,7 @@ Window {
             }
         }
 
-        SkipButton { forward: true; anchors.verticalCenter: parent.verticalCenter }
+        SkipButton { id: skipFwd; forward: true; anchors.verticalCenter: parent.verticalCenter }
     }
 
     // ---- Bottom line: times, seek, subtitles, settings -------------------
@@ -745,8 +765,8 @@ Window {
             win.poke();
             switch (event.key) {
             case Qt.Key_Space: mpv.togglePause(); break;
-            case Qt.Key_Left: mpv.seekBy(-5); break;
-            case Qt.Key_Right: mpv.seekBy(5); break;
+            case Qt.Key_Left: skipBack.trigger(); break;
+            case Qt.Key_Right: skipFwd.trigger(); break;
             case Qt.Key_Down: mpv.volume = Math.max(0, mpv.volume - 5); win.showVolume(); break;
             case Qt.Key_Up: mpv.volume = Math.min(130, mpv.volume + 5); win.showVolume(); break;
             case Qt.Key_F: win.toggleFullscreen(); break;
